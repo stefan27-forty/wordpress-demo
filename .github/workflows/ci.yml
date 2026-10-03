@@ -1,0 +1,67 @@
+name: WordPress Deploy
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ASUS_IP }}
+          username: ${{ secrets.ASUS_USER }}
+          password: ${{ secrets.ASUS_PASSWORD }}
+          script: |
+            mkdir -p /opt/wordpress 
+            cd /opt/wordpress
+
+            cat > docker-compose.yml << 'EOF'
+            services:
+              wordpress:
+                image: wordpress:latest
+                ports:
+                  - "8080:80"
+                environment:
+                  WORDPRESS_DB_HOST: db
+                  WORDPRESS_DB_USER: wordpress
+                  WORDPRESS_DB_PASSWORD: wordpress
+                  WORDPRESS_DB_NAME: wordpress
+                volumes:
+                  - wordpress_data:/var/www/html
+                depends_on:
+                  - db
+
+              db: 
+                image: mysql:8.0
+                environment:
+                  MYSQL_DATABASE: wordpress
+                  MYSQL_USER: wordpress
+                  MYSQL_PASSWORD: wordpress
+                  MYSQL_ROOT_PASSWORD: rootpassword
+                volumes:
+                  - db_data:/var/lib/mysql
+
+            volumes:
+              wordpress_data: 
+              db_data:
+            EOF
+
+            docker compose down || true
+            docker compose up -d 
+
+      - name: Send notification to Telegram
+        uses: appleboy/telegram-action@master
+        if: always()
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            *WordPress Deploy* #${{ github.run_number }}
+            *Статус:* ${{ job.status }}
+            *Автор:* ${{ github.actor }}
+            *Ссылка:* https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
