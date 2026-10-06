@@ -19,6 +19,7 @@ jobs:
           script: |
             mkdir -p /opt/wordpress 
             cd /opt/wordpress
+            export COMPOSE_HTTP_TIMEOUT=300
             which docker-compose || apt install docker-compose -y
 
             cat > docker-compose.yml << 'EOF'
